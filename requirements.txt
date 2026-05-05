@@ -5,3 +5,4 @@ geopy
 scikit-learn
 requests
 folium
+streamlit-geolocation
