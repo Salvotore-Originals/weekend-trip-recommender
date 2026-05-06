@@ -15,7 +15,7 @@ class MLRecommender:
         df["popularity"] = np.random.randint(1, 100, len(df))
         self.model.fit(df[["popularity"]], df["popularity"])
 
-    def get_nearby_places_clean(self, destination, k=6):
+    def get_nearby_places(self, destination, k=6):
 
         df = self.data.copy()
 
@@ -38,7 +38,6 @@ class MLRecommender:
         df["popularity"] = np.random.randint(1, 100, len(df))
         df["ml_score"] = self.model.predict(df[["popularity"]])
 
-        # Final score
         df["final_score"] = df["ml_score"] * 0.6 - df["dist_dest"] * 0.4
 
         df = df.sort_values(by="final_score", ascending=False).head(k)
