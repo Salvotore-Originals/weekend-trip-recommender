@@ -3,16 +3,16 @@ import pandas as pd
 import os
 from streamlit_geolocation import streamlit_geolocation
 
-from src.route_planner import RoutePlanner
+from src.ml_model import MLRecommender
 from src.map_utils import create_map
-from src.utils import estimate_travel_time, estimate_fuel_cost
+from src.utils import calculate_distance, estimate_travel_time, estimate_fuel_cost
 from src.risk_engine import TravelRiskEngine
 from src.weather import get_weather
 
 st.set_page_config(page_title="Weekend Trip Recommender", layout="wide")
 st.title("🌍 Weekend Trip Recommender")
 
-# -------- DATA --------
+# -------- LOAD DATA --------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 file_path = os.path.join(BASE_DIR, "data", "places.csv")
 
@@ -27,7 +27,10 @@ data = data.dropna(subset=["latitude", "longitude"])
 # -------- START --------
 st.subheader("📍 Starting Point")
 
-option = st.radio("Choose starting point:", ["Use My Current Location", "Select manually"])
+option = st.radio(
+    "Choose starting point:",
+    ["Use My Current Location", "Select manually"]
+)
 
 loc = streamlit_geolocation()
 gps = None
@@ -62,17 +65,20 @@ people = st.sidebar.number_input("People", 1, 20, 2)
 # -------- PLAN --------
 if st.button("Plan Trip"):
 
-    planner = RoutePlanner(data)
+    # ✅ DIRECT ML CALL (NO route_planner dependency)
+    recommender = MLRecommender(data)
 
-    places = planner.get_nearby_places(destination, k)
+    places = recommender.recommend_nearby(destination, k)
 
-    dist = planner.get_distance(start, destination)
+    # -------- DISTANCE --------
+    dist = calculate_distance(start, destination)
     time = estimate_travel_time(dist)
     cost = estimate_fuel_cost(dist)
 
+    # -------- WEATHER --------
     weather = get_weather(destination[0], destination[1])
 
-    # Best time logic
+    # -------- BEST TIME --------
     temp = weather["temp"]
     if temp > 32:
         best = "October to February"
@@ -81,11 +87,12 @@ if st.button("Plan Trip"):
     else:
         best = "September to March"
 
+    # -------- RISK --------
     risk_engine = TravelRiskEngine()
     score = risk_engine.total_risk(weather, dist, k)
     level = risk_engine.risk_level(score)
 
-    # -------- UI --------
+    # -------- OUTPUT --------
     st.subheader("📊 Trip Summary")
 
     c1, c2, c3 = st.columns(3)
@@ -98,14 +105,14 @@ if st.button("Plan Trip"):
     st.subheader("🌦 Weather")
     st.write(f"{weather['temp']}°C | {weather['condition']}")
 
-    st.subheader("🧭 Best Time")
+    st.subheader("🧭 Best Time to Visit")
     st.success(best)
 
-    st.subheader("⚠️ Risk")
+    st.subheader("⚠️ Risk Analysis")
     st.metric("Score", score)
     st.metric("Level", level)
 
-    st.subheader("📍 Places near destination")
+    st.subheader("📍 Places Near Destination")
 
     threshold = places["final_score"].quantile(0.7)
 
