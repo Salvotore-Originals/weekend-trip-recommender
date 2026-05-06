@@ -7,14 +7,12 @@ from src.route_planner import RoutePlanner
 from src.map_utils import create_map
 from src.utils import estimate_travel_time, estimate_fuel_cost
 from src.risk_engine import TravelRiskEngine
-from src.weather import get_weather  # now Open-Meteo based
+from src.weather import get_weather
 
-# ---------------- CONFIG ----------------
 st.set_page_config(page_title="Weekend Trip Recommender", layout="wide")
 st.title("🌍 Weekend Trip Recommender")
-st.success("🤖 ML-powered recommendations enabled")
 
-# ---------------- DATA ----------------
+# -------- DATA --------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 file_path = os.path.join(BASE_DIR, "data", "places.csv")
 
@@ -26,7 +24,7 @@ data["latitude"] = pd.to_numeric(data["latitude"], errors="coerce")
 data["longitude"] = pd.to_numeric(data["longitude"], errors="coerce")
 data = data.dropna(subset=["latitude", "longitude"])
 
-# ---------------- START ----------------
+# -------- START --------
 st.subheader("📍 Starting Point")
 
 start_option = st.radio(
@@ -37,117 +35,81 @@ start_option = st.radio(
 gps_location = None
 loc = streamlit_geolocation()
 
-if loc and loc.get("latitude") is not None:
+if loc and loc.get("latitude"):
     lat, lon = loc["latitude"], loc["longitude"]
     if 6 <= lat <= 38 and 68 <= lon <= 98:
         gps_location = (lat, lon)
 
 if start_option == "Use My Current Location":
     if gps_location is None:
-        st.error("❌ Enable GPS access")
+        st.error("Enable GPS")
         st.stop()
     start_location = gps_location
 else:
-    start_name = st.selectbox("Select start", sorted(data["name"].dropna().unique()))
+    start_name = st.selectbox("Select start", sorted(data["name"].unique()))
     row = data[data["name"] == start_name].iloc[0]
     start_location = (row["latitude"], row["longitude"])
 
-# ---------------- DESTINATION ----------------
+# -------- DESTINATION --------
 st.subheader("🎯 Destination")
 
-destination_name = st.selectbox("Choose destination", sorted(data["name"].dropna().unique()))
+destination_name = st.selectbox("Choose destination", sorted(data["name"].unique()))
 row = data[data["name"] == destination_name].iloc[0]
 destination = (row["latitude"], row["longitude"])
 
-# ---------------- SETTINGS ----------------
-st.sidebar.header("🧭 Trip Settings")
+# -------- SETTINGS --------
+st.sidebar.header("Trip Settings")
+num_stops = st.sidebar.slider("Nearby Places", 3, 10, 6)
+num_people = st.sidebar.number_input("People", 1, 20, 2)
 
-num_stops = st.sidebar.slider("📌 Stops", 1, 10, 5)
-num_people = st.sidebar.number_input("👥 People", 1, 20, 2)
-
-# ---------------- PLAN ----------------
-if st.button("🚀 Plan Trip"):
+# -------- PLAN --------
+if st.button("Plan Trip"):
 
     planner = RoutePlanner(data)
+    nearby_places = planner.get_nearby_places(destination, num_stops)
 
-    route_places = planner.get_places_along_route(
-        start_location,
-        destination,
-        num_stops
-    )
-
-    # ---------------- DISTANCE ----------------
-    prev = start_location
-    total_distance = 0
-
-    for _, r in route_places.iterrows():
-        curr = (r["latitude"], r["longitude"])
-        total_distance += planner.get_distance(prev, curr)
-        prev = curr
-
-    total_distance += planner.get_distance(prev, destination)
-
-    # ---------------- METRICS ----------------
+    total_distance = planner.get_distance(start_location, destination)
     travel_time = estimate_travel_time(total_distance)
     fuel_cost = estimate_fuel_cost(total_distance)
 
-    # ---------------- WEATHER (OPEN-METEO - NO API KEY) ----------------
     weather = get_weather(destination[0], destination[1])
 
-    # ---------------- AI RISK ENGINE ----------------
-    risk_engine = TravelRiskEngine()
+    # -------- BEST TIME --------
+    temp = weather["temp"]
 
-    risk_score = risk_engine.total_risk(
-        weather,
-        total_distance,
-        num_stops
-    )
-
-    risk_level = risk_engine.risk_level(risk_score)
-
-    # ---------------- OUTPUT ----------------
-    st.subheader("📊 Trip Summary")
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("📏 Distance (km)", f"{total_distance:.2f}")
-    col2.metric("⏱ Travel Time (hrs)", f"{travel_time:.2f}")
-    col3.metric("⛽ Fuel Cost (₹)", f"{fuel_cost:.2f}")
-
-    st.metric("👥 Travelers", num_people)
-
-    # ---------------- WEATHER ----------------
-    st.subheader("🌦 Destination Weather")
-
-    st.write(f"📍 {destination_name}")
-
-    st.write(f"🌡 Temperature: {weather['temp']}°C")
-    st.write(f"🌤 Condition: {weather['condition']}")
-
-    # ---------------- AI INTELLIGENCE ----------------
-    st.subheader("Crowd Control")
-
-    col1, col2 = st.columns(2)
-
-    col1.metric("⚠️ Risk Score", f"{risk_score}/100")
-    col2.metric("🧭 Risk Level", risk_level)
-
-    if risk_score < 30:
-        st.success("✔ Safe travel conditions")
-    elif risk_score < 60:
-        st.warning("⚠ Moderate risk detected")
+    if temp > 32:
+        best_time = "October to February (Cooler months)"
+    elif temp < 20:
+        best_time = "March to June (Pleasant weather)"
     else:
-        st.error("🚨 High-risk journey")
+        best_time = "September to March (Ideal conditions)"
 
-    # ---------------- MAP ----------------
-    st.subheader("🗺 Route Map")
+    risk_engine = TravelRiskEngine()
+    risk_score = risk_engine.total_risk(weather, total_distance, num_stops)
 
-    full_route = route_places.copy()
-    full_route.loc[len(full_route)] = {
-        "name": destination_name,
-        "latitude": destination[0],
-        "longitude": destination[1]
-    }
+    # -------- OUTPUT --------
+    st.subheader("Trip Summary")
 
-    trip_map = create_map(full_route, start_location)
-    st.components.v1.html(trip_map._repr_html_(), height=650)
+    st.metric("Distance (km)", f"{total_distance:.2f}")
+    st.metric("Travel Time (hrs)", f"{travel_time:.2f}")
+    st.metric("Fuel Cost (₹)", f"{fuel_cost:.2f}")
+
+    st.subheader("Best Time to Visit")
+    st.success(best_time)
+
+    st.subheader("Nearby Places")
+
+    threshold = nearby_places["final_score"].quantile(0.7)
+
+    for _, row in nearby_places.iterrows():
+        tag = "⭐ Must Visit" if row["final_score"] >= threshold else ""
+        st.write(f"{row['name']} — {row['dist_dest']:.1f} km {tag}")
+
+    # -------- MAP --------
+    route_df = pd.DataFrame([
+        {"name": "Start", "latitude": start_location[0], "longitude": start_location[1]},
+        {"name": destination_name, "latitude": destination[0], "longitude": destination[1]}
+    ])
+
+    trip_map = create_map(route_df, start_location)
+    st.components.v1.html(trip_map._repr_html_(), height=600)
