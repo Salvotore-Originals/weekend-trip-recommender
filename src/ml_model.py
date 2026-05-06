@@ -8,30 +8,29 @@ class MLRecommender:
     def __init__(self, data):
         self.data = data
         self.model = RandomForestRegressor(n_estimators=100, random_state=42)
-        self._train_model()
+        self._train()
 
-    def _train_model(self):
+    def _train(self):
         df = self.data.copy()
         df["popularity"] = np.random.randint(1, 100, len(df))
         self.model.fit(df[["popularity"]], df["popularity"])
 
-    def get_nearby_places(self, destination, k=6):
-
+    def recommend_nearby(self, destination, k=6):
         df = self.data.copy()
 
         # Remove duplicates
         df = df.drop_duplicates(subset=["name"])
 
-        # Distance from destination
+        # Compute distance
         df["dist_dest"] = df.apply(
             lambda x: calculate_distance(destination, (x["latitude"], x["longitude"])),
             axis=1
         )
 
-        # Filter nearby
+        # Keep nearby (<= 80 km)
         df = df[df["dist_dest"] <= 80]
 
-        if len(df) < k:
+        if df.empty:
             df = self.data.copy()
 
         # ML scoring

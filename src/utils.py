@@ -4,7 +4,7 @@ def calculate_distance(loc1, loc2):
     return geodesic(loc1, loc2).km
 
 def estimate_travel_time(distance):
-    return distance / 50
+    return distance / 50  # avg speed
 
 def estimate_fuel_cost(distance):
-    return distance * 7
+    return distance * 7  # ₹ per km

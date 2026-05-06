@@ -5,6 +5,7 @@ class TravelRiskEngine:
         condition = weather.get("condition", "").lower()
 
         risk = 0
+
         if "rain" in condition:
             risk += 40
         if temp > 38:
