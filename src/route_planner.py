@@ -1,28 +1,15 @@
 from src.utils import calculate_distance
-import pandas as pd
+from src.ml_model import MLRecommender
+
 
 class RoutePlanner:
 
     def __init__(self, data):
         self.data = data
+        self.ml_model = MLRecommender(data)
 
     def get_places_along_route(self, start, end, k=5):
+        return self.ml_model.rank_places(start, end, k)
 
-        df = self.data.copy()
-
-        df["dist_start"] = df.apply(
-            lambda x: calculate_distance(start, (x["latitude"], x["longitude"])),
-            axis=1
-        )
-
-        df["dist_end"] = df.apply(
-            lambda x: calculate_distance(end, (x["latitude"], x["longitude"])),
-            axis=1
-        )
-
-        df["score"] = 0.3 * df["dist_start"] + 0.7 * df["dist_end"]
-
-        return df.sort_values("score").head(k)[["name", "latitude", "longitude"]]
-
-    def get_distance(self, a, b):
-        return calculate_distance(a, b)
+    def get_distance(self, loc1, loc2):
+        return calculate_distance(loc1, loc2)

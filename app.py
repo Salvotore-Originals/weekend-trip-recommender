@@ -12,6 +12,7 @@ from src.weather import get_weather  # now Open-Meteo based
 # ---------------- CONFIG ----------------
 st.set_page_config(page_title="Weekend Trip Recommender", layout="wide")
 st.title("🌍 Weekend Trip Recommender")
+st.success("🤖 ML-powered recommendations enabled")
 
 # ---------------- DATA ----------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -124,7 +125,7 @@ if st.button("🚀 Plan Trip"):
     st.write(f"🌤 Condition: {weather['condition']}")
 
     # ---------------- AI INTELLIGENCE ----------------
-    st.subheader("🧠 AI Threat Intelligence")
+    st.subheader("Crowd Control")
 
     col1, col2 = st.columns(2)
 
